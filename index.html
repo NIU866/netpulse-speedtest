@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1517">
+  <meta name="description" content="在浏览器中测量下载、上传、HTTP 延迟与抖动，实时查看曲线，并在本机保留历史记录。">
+  <meta name="netpulse-local-node" content="off">
+  <title>NetPulse · 网络测速</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./netpulse.css">
+  <script type="module" src="./dashboard.js"></script>
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-inner">
+      <a class="wordmark" href="#console" aria-label="NetPulse 测速台"><span class="logo" aria-hidden="true"></span>Net<span>Pulse</span></a>
+      <nav aria-label="页面导航">
+        <a href="#console">测速台</a>
+        <a href="#history">历史记录</a>
+        <button id="method-open" class="nav-button" type="button">测速说明</button>
+      </nav>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="console" aria-labelledby="console-title">
+      <div class="page-head">
+        <div>
+          <h1 id="console-title">网络测速<span class="title-dot" aria-hidden="true">.</span></h1>
+          <p>测量这台设备到测速节点的实际连接表现。</p>
+        </div>
+        <fieldset id="modes" class="mode-switch">
+          <legend class="sr-only">测速模式与测试数据上限</legend>
+          <label><input type="radio" name="mode" value="light" checked><span>轻量 <small>10 MB</small></span></label>
+          <label><input type="radio" name="mode" value="standard"><span>标准 <small>40 MB</small></span></label>
+        </fieldset>
+      </div>
+      <div class="console-grid">
+        <section class="panel instrument" aria-labelledby="meter-heading">
+          <div class="panel-head"><h2 id="meter-heading">速度仪表</h2><span id="run-status" class="state" aria-live="polite">准备就绪</span></div>
+          <div class="gauge">
+            <canvas id="dial" aria-hidden="true"></canvas>
+            <div class="gauge-reading">
+              <span id="gauge-label">连接速率</span>
+              <strong id="gauge-value">—</strong>
+              <span class="gauge-unit">Mbps</span>
+            </div>
+          </div>
+          <div class="action-area">
+            <button class="start" id="test-action" type="button"><i aria-hidden="true"></i><span>开始测速</span></button>
+            <p id="test-note">本次测试数据最多 10 MB</p>
+          </div>
+          <div class="node-line">
+            <span class="node-name"><i class="node-icon" aria-hidden="true"></i>测速节点</span>
+            <strong id="fixed-node">Cloudflare · 自动就近</strong>
+            <select id="node-select" aria-label="选择测速节点" hidden>
+              <option value="cloudflare">Cloudflare · 自动就近</option>
+              <option value="self">本站节点</option>
+            </select>
+          </div>
+        </section>
+        <div class="readouts">
+          <div class="metrics">
+            <section class="metric down"><h2><span class="metric-icon" aria-hidden="true">↓</span>下载速度</h2><p><strong id="down-value">—</strong><span>Mbps</span></p></section>
+            <section class="metric up"><h2><span class="metric-icon" aria-hidden="true">↑</span>上传速度</h2><p><strong id="up-value">—</strong><span>Mbps</span></p></section>
+            <section class="metric latency"><h2><span class="metric-icon" aria-hidden="true">↔</span>延迟</h2><p><strong id="latency-value">—</strong><span>ms</span></p></section>
+            <section class="metric jitter"><h2><span class="metric-icon" aria-hidden="true">≈</span>抖动</h2><p><strong id="jitter-value">—</strong><span>ms</span></p></section>
+          </div>
+          <section class="panel chart-panel" aria-labelledby="chart-title">
+            <div class="panel-head"><h2 id="chart-title">速率曲线</h2><div class="legend"><span>下载</span><span>上传</span></div></div>
+            <div class="chart-wrap">
+              <canvas id="chart" role="img" aria-label="下载与上传速度随时间的变化"></canvas>
+              <span id="chart-empty">开始测速后显示曲线</span>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p class="error" id="test-error" role="alert" hidden></p>
+      <noscript><p class="error">请启用 JavaScript 后开始测速。</p></noscript>
+    </section>
+    <section id="history" class="history" aria-labelledby="history-title">
+      <div class="history-head">
+        <div><h2 id="history-title">历史记录</h2><p id="history-note">最近 12 次完整测试，仅保存在此浏览器。</p></div>
+        <button type="button" class="quiet" id="clear-history" hidden>清空记录</button>
+      </div>
+      <div class="history-empty" id="history-empty"><span class="clock-icon" aria-hidden="true"></span>暂无测速记录</div>
+      <div class="table-scroll" id="history-table" hidden>
+        <table>
+          <caption class="sr-only">此浏览器最近完成的测速结果</caption>
+          <thead><tr><th>测试时间</th><th>节点 / 模式</th><th>下载 <small>Mbps</small></th><th>上传 <small>Mbps</small></th><th>延迟 <small>ms</small></th><th>抖动 <small>ms</small></th></tr></thead>
+          <tbody id="history-rows"></tbody>
+        </table>
+      </div>
+    </section>
+    <footer><span class="footer-brand">NetPulse</span><a href="https://github.com/NIU866/netpulse-speedtest">GitHub 源码</a></footer>
+  </main>
+  <dialog id="method-dialog" aria-labelledby="method-title">
+    <h2 id="method-title">测速说明</h2>
+    <h3>测的是什么</h3>
+    <p>下载和上传分别传输测试数据，按成功传输的总字节与请求总耗时计算 Mbps。1 Mbps 等于每秒 100 万比特。曲线上的每个点对应一次完成的请求。</p>
+    <p>延迟取多次空载 HTTP 请求耗时的中位数。抖动取相邻两次延迟差绝对值的平均值。Wi-Fi、代理、节点距离和其他下载都可能影响结果。</p>
+    <h3>流量与记录</h3>
+    <p>轻量模式最多传输 10 MB 测试数据，标准模式最多 40 MB，另有少量协议开销。你可以随时停止测试。</p>
+    <p>默认向 Cloudflare 发送测速请求，上传内容由浏览器随机生成。节点可以看到连接 IP。测试历史记录保存在此浏览器。</p>
+    <form method="dialog"><button class="dialog-ok">知道了</button></form>
+  </dialog>
+  <dialog id="clear-dialog" aria-labelledby="clear-title">
+    <h2 id="clear-title">清空测速记录？</h2><p>将删除此浏览器里保存的所有测速结果。</p>
+    <form method="dialog" class="dialog-actions"><button class="quiet" value="cancel" autofocus>取消</button><button class="dialog-ok" value="clear">清空记录</button></form>
+  </dialog>
+</body>
+</html>

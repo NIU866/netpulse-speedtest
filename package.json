@@ -1,0 +1,9 @@
+{
+  "name": "netpulse-speedtest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "浏览器网速测试与可选的自托管测速节点",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs", "test": "node --test" }
+}
