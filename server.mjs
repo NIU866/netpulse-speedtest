@@ -48,6 +48,15 @@ const server = createServer(async (req, res) => {
       res.end(String(count));
       return;
     }
+    if (req.method === 'GET' && url.pathname === '/sample.bin') {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': 524288 });
+      res.end(downloadData.subarray(0, 524288));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/ping.txt') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' }).end('netpulse\n');
+      return;
+    }
     const asset = assets.get(url.pathname);
     if (!asset || req.method !== 'GET') {
       res.writeHead(404).end('Not found');

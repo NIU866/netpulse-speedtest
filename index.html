@@ -52,10 +52,12 @@
           </div>
           <div class="node-line">
             <span class="node-name"><i class="node-icon" aria-hidden="true"></i>测速节点</span>
-            <strong id="fixed-node">Cloudflare · 自动就近</strong>
-            <select id="node-select" aria-label="选择测速节点" hidden>
+            <select id="node-select" aria-label="选择测速节点">
+              <option value="auto">自动选择</option>
               <option value="cloudflare">Cloudflare · 自动就近</option>
-              <option value="self">本站节点</option>
+              <option value="tokyo">东京 · A573</option>
+              <option value="losangeles">洛杉矶 · Clouvider</option>
+              <option value="static">网页所在节点 · 仅下载</option>
             </select>
           </div>
         </section>
@@ -101,7 +103,8 @@
     <p>延迟取多次空载 HTTP 请求耗时的中位数。抖动取相邻两次延迟差绝对值的平均值。Wi-Fi、代理、节点距离和其他下载都可能影响结果。</p>
     <h3>流量与记录</h3>
     <p>轻量模式最多传输 10 MB 测试数据，标准模式最多 40 MB，另有少量协议开销。你可以随时停止测试。</p>
-    <p>默认向 Cloudflare 发送测速请求，上传内容由浏览器随机生成。节点可以看到连接 IP。测试历史记录保存在此浏览器。</p>
+    <p>自动模式先探测 Cloudflare，遇到连接问题会尝试 LibreSpeed 的东京和洛杉矶节点。如果都不可用，改测网页所在节点的下载、延迟和抖动。静态网页节点没有上传接口。</p>
+    <p>上传内容由浏览器随机生成。被探测的节点可以看到连接 IP。历史记录只存在此浏览器。</p>
     <form method="dialog"><button class="dialog-ok">知道了</button></form>
   </dialog>
   <dialog id="clear-dialog" aria-labelledby="clear-title">

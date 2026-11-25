@@ -80,3 +80,41 @@ test('a short download or an upload landing page cannot produce a completed resu
     await assert.rejects(measureConnection({ origin: target, signal: new AbortController().signal }), /确认/);
   } finally { const closed = once(mock, 'close'); mock.close(); await closed; }
 });
+
+test('unavailable API can fall back to a static node without inventing an upload rate', async () => {
+  const events = [];
+  const nodes = [
+    { id: 'bad', label: 'Unavailable', type: 'librespeed', base: origin + '/missing/' },
+    { id: 'static', label: 'Static', type: 'static', base: origin + '/' },
+  ];
+  const result = await measureConnection({ nodes, signal: new AbortController().signal, onEvent: e => events.push(e) });
+  assert.equal(result.nodeId, 'static'); assert.equal(result.upload, null);
+  assert.ok(result.download > 0 && result.bytes > 0 && result.bytes <= MODES.light.down);
+  assert.deepEqual(events.filter(e => e.type === 'phase').map(e => e.phase), ['latency', 'down']);
+});
+
+test('LibreSpeed probes use empty.php and downloads use whole MiB chunks within budget', async () => {
+  const block = Buffer.alloc(8_388_608, 37);
+  const received = { down: 0, up: 0 };
+  const node = createServer((req, res) => {
+    const url = new URL(req.url, origin);
+    if (url.searchParams.get('cors') !== 'true') return res.writeHead(400).end();
+    if (url.pathname === '/backend/empty.php') {
+      req.on('data', chunk => { received.up += chunk.length; });
+      req.on('end', () => res.end()); return;
+    }
+    if (url.pathname !== '/backend/garbage.php') return res.writeHead(404).end();
+    const chunks = Number(url.searchParams.get('ckSize'));
+    if (!Number.isInteger(chunks) || chunks < 1 || chunks > 8) return res.writeHead(400).end();
+    received.down += chunks * 1_048_576;
+    res.end(block.subarray(0, chunks * 1_048_576));
+  });
+  node.listen(0, '127.0.0.1'); await once(node, 'listening');
+  try {
+    const target = { id: 'libre', label: 'LibreSpeed', type: 'librespeed', base: 'http://127.0.0.1:' + node.address().port + '/backend/' };
+    const result = await measureConnection({ nodes: [target], signal: new AbortController().signal });
+    assert.equal(result.nodeId, 'libre'); assert.ok(result.download > 0 && result.upload > 0);
+    assert.ok(received.down <= MODES.light.down && received.up <= MODES.light.up);
+    assert.equal(received.down + received.up, result.bytes);
+  } finally { const closed = once(node, 'close'); node.close(); await closed; }
+});

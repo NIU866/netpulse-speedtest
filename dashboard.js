@@ -1,4 +1,4 @@
-import { CLOUDFLARE, MODES, measureConnection } from './measure.js';
+import { PUBLIC_NODES, MODES, measureConnection } from './measure.js';
 
 const el = id => document.getElementById(id);
 const action = el('test-action');
@@ -12,6 +12,9 @@ const phaseNames = { latency: '测量延迟', down: '测量下载', up: '测量�
 const keys = { down: 'down-value', up: 'up-value', latency: 'latency-value', jitter: 'jitter-value' };
 const storeKey = 'netpulse.history.v1';
 const localNode = document.querySelector('meta[name="netpulse-local-node"]').content === 'on';
+const staticNode = { id: 'static', label: '网页节点', type: 'static', base: new URL('./', location.href).href };
+const selfNode = { id: 'self', label: '本站', type: 'bytes', base: location.origin };
+const nodesById = new Map([...PUBLIC_NODES, staticNode, selfNode].map(n => [n.id, n]));
 const formatDate = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
 });
@@ -138,7 +141,7 @@ function readHistory() {
   if (!Array.isArray(data)) return [];
   return data.filter(r => r && ['download','upload','latency','jitter'].every(k => Number.isFinite(r[k]) && r[k] >= 0)
     && Number.isFinite(r.at) && r.at > 0 && r.at <= 8.64e15 && Object.hasOwn(MODES, r.mode)
-    && ['self','cloudflare'].includes(r.node)).slice(0, 12);
+    && nodesById.has(r.node)).slice(0, 12);
 }
 function refreshHistory() {
   try { historyRows = readHistory(); }
@@ -152,7 +155,7 @@ function renderHistory() {
   rows.replaceChildren();
   for (const h of historyRows) {
     const row = document.createElement('tr');
-    const source = h.node === 'self' ? '本站' : 'Cloudflare';
+    const source = nodesById.get(h.node).label;
     for (const value of [formatDate.format(h.at), source + ' / ' + MODES[h.mode].label,
       number(h.download), number(h.upload), number(h.latency), number(h.jitter)]) {
       const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
@@ -185,13 +188,18 @@ function resetMeter() {
   points = [];
   for (const id of Object.values(keys)) el(id).textContent = '—';
   el('chart-empty').hidden = false; el('test-error').hidden = true;
+  nodeSelect.options[0].textContent = '自动选择';
   action.querySelector('span').textContent = '开始测速';
   displayDial(null, '连接速率', 'down'); drawChart(); setState('准备就绪', 'idle');
   const profile = MODES[mode()];
   note.textContent = '本次测试数据最多 ' + (profile.down + profile.up) / 1e6 + ' MB';
 }
 function handleEvent(e) {
-  if (e.type === 'phase') {
+  if (e.type === 'probeNode') {
+    setState('连接节点', 'active'); note.textContent = '正在连接 ' + e.label + '…';
+  } else if (e.type === 'node') {
+    if (nodeSelect.value === 'auto') nodeSelect.options[0].textContent = '自动 · ' + e.label;
+  } else if (e.type === 'phase') {
     setState(phaseNames[e.phase], 'active');
     note.textContent = e.phase === 'latency' ? '正在建立连接…' : '正在传输测试数据…';
     displayDial(null, e.phase === 'up' ? '实时上传' : e.phase === 'down' ? '实时下载' : '连接速率', e.phase);
@@ -210,17 +218,20 @@ function handleEvent(e) {
 }
 async function test() {
   if (controller) { controller.abort(); action.disabled = true; return; }
-  const selectedMode = mode(), selectedNode = localNode ? nodeSelect.value : 'cloudflare';
+  const selectedMode = mode(), selectedNode = nodeSelect.value;
+  const targets = selectedNode === 'auto' ? [...PUBLIC_NODES, staticNode] : [nodesById.get(selectedNode)];
   controller = new AbortController();
   resetMeter();
   el('modes').disabled = true; nodeSelect.disabled = true; action.dataset.running = 'true';
   action.querySelector('span').textContent = '停止测速';
   try {
-    const result = await measureConnection({ origin: selectedNode === 'self' ? location.origin : CLOUDFLARE,
+    const result = await measureConnection({ nodes: targets,
       mode: selectedMode, signal: controller.signal, onEvent: handleEvent });
-    setState('测试完成', 'done'); displayDial(result.download, '本次下载', 'down');
+    const full = result.upload !== null;
+    setState(full ? '测试完成' : '仅下载完成', 'done'); displayDial(result.download, '本次下载', 'down');
     note.textContent = '完成 ' + (result.bytes / 1e6).toFixed(2) + ' MB · 用时 ' + result.seconds.toFixed(1) + ' 秒';
-    saveHistory(result, selectedMode, selectedNode);
+    if (full) saveHistory(result, selectedMode, result.nodeId);
+    else note.textContent += ' · 静态节点不支持上传，本次未计入历史。';
   } catch (error) {
     if (error.name === 'AbortError') setState('已停止', 'idle');
     else {
@@ -234,7 +245,7 @@ async function test() {
   }
 }
 
-if (localNode) { nodeSelect.hidden = false; el('fixed-node').hidden = true; }
+if (localNode) nodeSelect.add(new Option('本站节点 · 支持上传', 'self'));
 action.addEventListener('click', test);
 el('modes').addEventListener('change', resetMeter);
 nodeSelect.addEventListener('change', resetMeter);
